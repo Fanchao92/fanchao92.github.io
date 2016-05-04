@@ -1,6 +1,8 @@
 package com.example.fanchaozhou.project3;
 
+import android.content.Context;
 import android.content.Intent;
+import android.content.SharedPreferences;
 import android.net.Uri;
 import android.os.Bundle;
 import android.support.v4.app.Fragment;
@@ -13,31 +15,31 @@ import android.widget.Toast;
 
 import java.io.File;
 
-public class NameListFragment extends Fragment {
+public class SamplesFragment extends Fragment {
 
-    private static final int REQUEST_DELETION_TYPE = 1;
-    private static final String REQUEST_DELETION_TAG = "Request Deletion Tag";
+    private static final int REQUEST_DELETION_RECORD = 1;
+    private static final String DELETION_RECORD_TAG = "Delete a single Record";
     private int itemPosition;
-    private NameListAdapter nameListAdapter = null;
+    SamplesAdapter samplesAdapter = null;
 
     @Override
     public void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
 
         if(savedInstanceState == null){
-            nameListAdapter = new NameListAdapter(getActivity(), R.layout.list_item_type, MainActivity.typeList);
+            samplesAdapter = new SamplesAdapter(getActivity(), R.layout.list_item_sample, MainActivity.recordList);
         }
     }
 
     @Override
     public View onCreateView(LayoutInflater inflater, ViewGroup container, Bundle savedInstanceState) {
         // Inflate the layout for this fragment
-        View rootView = inflater.inflate(R.layout.fragment_name_list, container, false);
+        View rootView = inflater.inflate(R.layout.fragment_sample_list, container, false);
 
         if(savedInstanceState == null){
-            ListView listView = (ListView)rootView.findViewById(R.id.name_list_listView);
-            listView.setAdapter(nameListAdapter);
-            final NameListFragment curFragment = this;
+            ListView listView = (ListView)rootView.findViewById(R.id.sample_list_listView);
+            listView.setAdapter(samplesAdapter);
+            final SamplesFragment curFragment = this;
 
             listView.setOnItemLongClickListener(new AdapterView.OnItemLongClickListener() {
                 @Override
@@ -48,13 +50,14 @@ public class NameListFragment extends Fragment {
 
                         return false;
                     } else {
+                        itemPosition = position;
                         MsgDialogFragment deletionDialog = new MsgDialogFragment();
                         Bundle messageBdl = new Bundle();
-                        messageBdl.putString(MsgDialogFragment.DELETION_MSG_TAG, getString(R.string.delete_type_msg));
+                        messageBdl.putString(MsgDialogFragment.DELETION_MSG_TAG, getString(R.string.delete_rec_msg));
                         deletionDialog.setArguments(messageBdl);
-                        deletionDialog.setTargetFragment(curFragment, REQUEST_DELETION_TYPE);
+                        deletionDialog.setTargetFragment(curFragment, REQUEST_DELETION_RECORD);
                         itemPosition = position;
-                        deletionDialog.show(getActivity().getSupportFragmentManager(), REQUEST_DELETION_TAG);
+                        deletionDialog.show(getFragmentManager(), DELETION_RECORD_TAG);
 
                         return true;
                     }
@@ -69,19 +72,14 @@ public class NameListFragment extends Fragment {
     public void onActivityResult(int requestCode, int resultCode, Intent data) {
         super.onActivityResult(requestCode, resultCode, data);
 
-        if(requestCode==REQUEST_DELETION_TYPE && resultCode== MsgDialogFragment.DELETION_POSITIVE){
+        if(requestCode==REQUEST_DELETION_RECORD && resultCode== MsgDialogFragment.DELETION_POSITIVE){
             RecordDBHelper dbHelper = new RecordDBHelper(getActivity());
-            for(int cnt = MainActivity.recordList.size()-1; cnt >= 0; cnt--){
-                if(MainActivity.typeList.get(itemPosition).typeID == MainActivity.recordList.get(cnt).typeID){
-                    File imageToDelete = new File(Uri.parse(MainActivity.recordList.get(cnt).fullsizePhotoUri).getPath());
-                    imageToDelete.delete();
-                    MainActivity.recordList.remove(cnt);
-                }
-            }
-            dbHelper.deleteOneType(MainActivity.typeList.get(itemPosition).typeID);
-            MainActivity.typeList.remove(itemPosition);
+            File imageToDelete = new File(Uri.parse(MainActivity.recordList.get(itemPosition).fullsizePhotoUri).getPath());
+            imageToDelete.delete();
+            dbHelper.deleteOneRec(MainActivity.recordList.get(itemPosition).recordID);
+            MainActivity.recordList.remove(itemPosition);
 
-            nameListAdapter.notifyDataSetChanged();
+            samplesAdapter.notifyDataSetChanged();
         }
     }
 
@@ -89,6 +87,6 @@ public class NameListFragment extends Fragment {
     public void onStart() {
         super.onStart();
 
-        nameListAdapter.notifyDataSetChanged();
+        samplesAdapter.notifyDataSetChanged();
     }
 }

@@ -1,6 +1,5 @@
 package com.example.fanchaozhou.project3;
 
-import android.app.Activity;
 import android.net.Uri;
 
 import com.googlecode.javacv.cpp.opencv_contrib.FaceRecognizer;
@@ -17,9 +16,7 @@ import java.util.ArrayList;
  */
 public class MyFaceRecognizer{
 
-    private Activity mActivity;
     private FaceRecognizer faceRecognizer;
-    private RECOGNIZER_TYPE type;
 
     public enum RECOGNIZER_TYPE{
         EIGENVECTOR,
@@ -27,17 +24,7 @@ public class MyFaceRecognizer{
         LBPH
     }
 
-    public MyFaceRecognizer(Activity mActivity, RECOGNIZER_TYPE type){
-        this.mActivity = mActivity;
-        this.type = type;
-    }
-
-    public void train(ArrayList<DBRecord> recList){
-        int cnt;
-        int[] labels = new int[ recList.size() ];
-        CvMat[] photoMatArray = new CvMat[ recList.size() ];
-        MatVector photoMatVector = new MatVector(recList.size());
-
+    public MyFaceRecognizer(RECOGNIZER_TYPE type){
         switch(type){
             case EIGENVECTOR:
                 faceRecognizer = createEigenFaceRecognizer();
@@ -49,6 +36,13 @@ public class MyFaceRecognizer{
                 faceRecognizer = createLBPHFaceRecognizer();
                 break;
         }
+    }
+
+    public void train(ArrayList<DBRecord> recList){
+        int cnt;
+        int[] labels = new int[ recList.size() ];
+        CvMat[] photoMatArray = new CvMat[ recList.size() ];
+        MatVector photoMatVector = new MatVector(recList.size());
 
         for(cnt = 0; cnt < photoMatArray.length; cnt++){
             CvMat grayImg = cvLoadImageM(Uri.parse(recList.get(cnt).fullsizePhotoUri).getPath(), CV_LOAD_IMAGE_GRAYSCALE);
@@ -61,7 +55,7 @@ public class MyFaceRecognizer{
             labels[ cnt ] = (int)recList.get(cnt).typeID;
         }
 
-        faceRecognizer.train(photoMatVector, labels);
+        faceRecognizer.update(photoMatVector, labels);
     }
 
     public int predict(File faceImgFile){
@@ -71,6 +65,16 @@ public class MyFaceRecognizer{
 
         cvEqualizeHist(face, grayFace);
         label = faceRecognizer.predict(grayFace);
+        System.out.println(label);
+        System.out.println(faceImgFile.getPath());
         return label;
+    }
+
+    public void load(String fileName){
+        faceRecognizer.load(fileName);
+    }
+
+    public void save(String fileName){
+        faceRecognizer.save(fileName);
     }
 }

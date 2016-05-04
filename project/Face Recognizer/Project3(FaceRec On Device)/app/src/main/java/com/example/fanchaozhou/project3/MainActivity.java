@@ -1,12 +1,11 @@
 package com.example.fanchaozhou.project3;
 
-import android.content.Context;
-import android.content.SharedPreferences;
 import android.os.Bundle;
 import android.support.v7.app.AppCompatActivity;
 import android.support.v7.widget.Toolbar;
 
 import java.io.File;
+import java.io.FileInputStream;
 import java.util.ArrayList;
 
 /**
@@ -32,7 +31,16 @@ public class MainActivity extends AppCompatActivity {
         setSupportActionBar(toolbar);
 
         faceDetector = new MyFaceDetector(this, getResources().openRawResource(R.raw.haarcascade_frontalface_alt), FD_FILE_NAME);
-        faceRecognizer = new MyFaceRecognizer(this, MyFaceRecognizer.RECOGNIZER_TYPE.LBPH);
+        faceRecognizer = new MyFaceRecognizer(MyFaceRecognizer.RECOGNIZER_TYPE.LBPH);
+
+        File trainingXmlFile = new File(getFilesDir(), getString(R.string.fr_file_name));
+        try{
+            FileInputStream fileInputStream = new FileInputStream(trainingXmlFile);
+            faceRecognizer.load(trainingXmlFile.getPath());
+            fileInputStream.close();
+        } catch (Exception e){
+            System.out.println(e);
+        }
 
         recordList = new ArrayList<>();
         typeList = new ArrayList<>();
