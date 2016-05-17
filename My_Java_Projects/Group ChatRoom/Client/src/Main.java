@@ -65,11 +65,29 @@ public class Main {
                 String reply;
                 ServerMsg serverMsg;
 
+                System.out.println("JOIN packet: "+joinPacket);
                 objOS.writeObject(joinPacket);      //Send the JOIN packet
                 reply = (String)objIS.readObject(); //Receive an ACK or an NAK
+                System.out.println("Unwrapped reply: "+reply);
                 serverMsg = msgUnwrapper(reply);
+                System.out.println("Message in the reply:\n"+serverMsg.message);//Print the message
                 if(serverMsg.msgType == ACK){ //If an ACK is received, start a ServerMsgReceiver Thread
-                    Thread thread = new Thread(new ServerMsgReceiver(server));
+                    Thread thread = new Thread(new Runnable() {
+                        @Override
+                        public void run() {
+                            try{
+                                while(true){
+                                    String msg = (String)objIS.readObject();   //Read the string from the server
+                                    ServerMsg serverMsg = msgUnwrapper(msg);   //Unwrap the packet and retrieve the content
+                                    if(serverMsg.msgType==ONLINE || serverMsg.msgType==OFFLINE || serverMsg.msgType==FWD){
+                                        System.out.println(serverMsg.message);
+                                    }
+                                }
+                            } catch (Exception e) {
+                                e.printStackTrace();
+                            }
+                        }
+                    });
                     thread.start();
 
                     while(true){
@@ -83,39 +101,11 @@ public class Main {
                         }
                     }
                 } else if(serverMsg.msgType == NAK) { //If an NAK is received, print the error message and exit
-                    System.out.println(serverMsg.message);
                     try{
                         server.close();
                     } catch (Exception e){
                         e.printStackTrace();
                     }
-                }
-            } catch (Exception e) {
-                e.printStackTrace();
-            }
-        }
-    }
-
-    private static class ServerMsgReceiver implements Runnable{
-        private Socket server = null;
-
-        public ServerMsgReceiver(Socket server){
-            this.server = server;
-        }
-
-        @Override
-        public void run() {
-            ObjectInputStream objIS;
-
-            try{
-                objIS = new ObjectInputStream(server.getInputStream());
-                while(true){
-                    String msg = (String)objIS.readObject();   //Read the string from the server
-                    ServerMsg serverMsg = msgUnwrapper(msg);
-                    if(serverMsg.msgType==ONLINE || serverMsg.msgType==OFFLINE || serverMsg.msgType==FWD){
-                        System.out.println(serverMsg.message);
-                    }
-                    System.out.println(msg);                   //Print the message on the screen
                 }
             } catch (Exception e) {
                 e.printStackTrace();
@@ -161,7 +151,7 @@ public class Main {
                 break;
             case ACK:
                 JsonArray jsonNameList = jsonObject.get(CONTENTFIELD).getAsJsonArray();
-                int clientNum = jsonNameList.size();
+                final int clientNum = jsonNameList.size();
                 content = "There are currently "+clientNum+" clients in the chatting room:\n";
                 for(int cnt = 0; cnt < clientNum; cnt++){
                     content += jsonNameList.get(cnt).getAsString()+"\n";

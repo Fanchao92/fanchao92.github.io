@@ -7,8 +7,8 @@ import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
 import java.net.ServerSocket;
 import java.net.Socket;
-import java.util.ArrayList;
-import java.util.HashSet;
+import java.util.Collection;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
@@ -32,8 +32,7 @@ public class Main {
     private static final String NAK_DUP_NAME = "Your user name is duplicated";
     private static final String NAK_TOO_MANY_USERS = "The number of clients has reached the limit";
 
-    private static final ArrayList<ClientInfo> clientInfoList = new ArrayList<>();
-    private static final HashSet<String> clientNameList = new HashSet<>();
+    private static ConcurrentHashMap<String, ClientInfo> clientInfoList = new ConcurrentHashMap<>();
     private static int MAX_CLIENT_NUM;
     private static int PORT_NUMBER;
 
@@ -44,6 +43,7 @@ public class Main {
 
             PORT_NUMBER = Integer.parseInt(args[ 0 ]);                  //Get the TCP port number
             MAX_CLIENT_NUM = Integer.parseInt(args[ 1 ]);               //Get the maximum number of clients
+
 
             try{
                 final ServerSocket serverSocket = new ServerSocket(PORT_NUMBER, MAX_CLIENT_NUM);//Create a server socket
@@ -91,6 +91,7 @@ public class Main {
                 joinPacket = (String)objIS.readObject();
                 clientMsg = msgUnwrapper(joinPacket);
                 clientInfo.clientName = clientMsg.message;
+                System.out.println("JOIN packet from "+clientMsg.message+": "+joinPacket);
 
                 if(clientInfoList.size() >= MAX_CLIENT_NUM){ //The number of clients exceeds the limit
                     System.out.println("Join REQ from "+clientInfo.clientName+"(IP address: "+clientInfo.clientSocket.getInetAddress()+
@@ -98,7 +99,7 @@ public class Main {
                     //Send an NAK
                     String nakPacket = msgWrapper(NAK, null, NAK_TOO_MANY_USERS);
                     clientInfo.objOS.writeObject(nakPacket);
-                } else if(clientNameList.contains(clientInfo.clientName)){  //The user name already exists
+                } else if(clientInfoList.containsKey(clientInfo.clientName)){  //The user name already exists
                     System.out.println("Join REQ from "+clientInfo.clientName+"(IP address: "+clientInfo.clientSocket.getInetAddress()+
                             ") is Denied. Reason: "+NAK_DUP_NAME);
                     //Send an NAK
@@ -107,21 +108,21 @@ public class Main {
                 } else {
                     String ackPacket = msgWrapper(ACK, null, null);
                     String onlinePacket = msgWrapper(ONLINE, clientInfo.clientName, null);
+                    Collection<ClientInfo> clientInfoCollection = null;
+
+                    System.out.println("ACK Packet for "+clientInfo.clientName+": "+ackPacket);
+                    System.out.println("ONLINE Packet of "+clientInfo.clientName+": "+onlinePacket);
 
                     clientInfo.objOS.writeObject(ackPacket);  //Send the ACK packet
-                    synchronized (clientInfoList){
-                        //Send an ONLINE notification to all the other users
-                        for(ClientInfo otherClientInfo:clientInfoList){  //Forward the message to every other client
-                            if(!otherClientInfo.clientName.equals(clientInfo.clientName)){//As long as it's not the user himself
-                                otherClientInfo.objOS.writeObject(onlinePacket);
-                            }
+                    //Send an ONLINE notification to all the other users
+                    clientInfoCollection = clientInfoList.values();
+                    for(ClientInfo otherClientInfo:clientInfoCollection){  //Forward the message to every other client
+                        if(!otherClientInfo.clientName.equals(clientInfo.clientName)){//As long as it's not the user himself
+                            otherClientInfo.objOS.writeObject(onlinePacket);
                         }
                     }
 
-                    synchronized (clientInfoList){
-                        clientInfoList.add(clientInfo);             //Add the information of the new client to the list
-                        clientNameList.add(clientInfo.clientName);  //Add the name of the user to the hash table
-                    }
+                    clientInfoList.put(clientInfo.clientName, clientInfo);  //Add the client to the name list
 
                     System.out.println("User "+
                             clientInfo.clientName+
@@ -135,24 +136,25 @@ public class Main {
                             System.out.println("A Client has dropped. Client Name: "+clientInfo.clientName+
                                     ". Client IP: "+clientInfo.clientSocket.getInetAddress());
                             String offlinePacket = msgWrapper(OFFLINE, clientInfo.clientName, null);
-                            synchronized (clientInfoList){
-                                //Send an ONLINE notification to all the other users
-                                for(ClientInfo otherClientInfo:clientInfoList){  //Forward the message to every other client
-                                    if(!otherClientInfo.clientName.equals(clientInfo.clientName)){//As long as it's not the user himself
-                                        otherClientInfo.objOS.writeObject(offlinePacket);
-                                    }
+                            System.out.println("OFFLINE packet: "+offlinePacket);
+                            //Send an ONLINE notification to all the other users
+                            clientInfoCollection = clientInfoList.values();
+                            for(ClientInfo otherClientInfo:clientInfoCollection){  //Forward the message to every other client
+                                if(!otherClientInfo.clientName.equals(clientInfo.clientName)){//As long as it's not the user himself
+                                    otherClientInfo.objOS.writeObject(offlinePacket);
                                 }
                             }
+
                             break;
                         } else {                //The client is sending a message
+                            System.out.println("SEND packet from "+clientInfo.clientName+": "+msg);
                             clientMsg = msgUnwrapper(msg);
                             msg = msgWrapper(FWD, clientInfo.clientName, clientMsg.message);
-                            synchronized (clientInfoList){
-                                for(ClientInfo otherClientInfo:clientInfoList){  //Forward the message to every other client
-                                    if(!otherClientInfo.clientName.equals(clientInfo.clientName)){//As long as it's not the user himself
-                                        System.out.println(msg);
-                                        otherClientInfo.objOS.writeObject(msg);
-                                    }
+                            System.out.println("FWD packet: "+msg);
+                            clientInfoCollection = clientInfoList.values();
+                            for(ClientInfo otherClientInfo:clientInfoCollection){  //Forward the message to every other client
+                                if(!otherClientInfo.clientName.equals(clientInfo.clientName)){//As long as it's not the user himself
+                                    otherClientInfo.objOS.writeObject(msg);
                                 }
                             }
                         }
@@ -161,16 +163,13 @@ public class Main {
             } catch(Exception e) {
                 e.printStackTrace();
             } finally {
-                try{
-                    if(clientInfo != null){                 //Close the client socket and remove the user information from the list
+                try {
+                    if (clientInfo != null) {                 //Close the client socket and remove the user information from the list
                         clientInfo.clientSocket.close();
-                        synchronized (clientInfoList){
-                            if(clientInfoList.remove(clientInfo)){
-                                clientNameList.remove(clientInfo.clientName);
-                                System.out.println("Client Info. is Removed from the list!");
-                            } else {
-                                System.out.println("Client is rejected before his info is added to the list");
-                            }
+                        if (clientInfoList.remove(clientInfo.clientName, clientInfo)) {
+                            System.out.println("Client Info. is Removed from the list!");
+                        } else {
+                            System.out.println("Client is rejected before his info is added to the list");
                         }
                     }
                 } catch (Exception e){
@@ -200,12 +199,11 @@ public class Main {
                 break;
             case ACK:
                 JsonArray jsonNameList = new JsonArray();
+                Collection<ClientInfo> clientInfoCollection = clientInfoList.values();
 
                 jsonObject.addProperty(USERNAMEFIELD, "");
-                synchronized (clientInfoList){
-                    for(ClientInfo curClientInfo:clientInfoList){
-                        jsonNameList.add(curClientInfo.clientName);
-                    }
+                for(ClientInfo curClientInfo:clientInfoCollection){
+                    jsonNameList.add(curClientInfo.clientName);
                 }
                 jsonObject.add(CONTENTFIELD, jsonNameList);
                 break;
