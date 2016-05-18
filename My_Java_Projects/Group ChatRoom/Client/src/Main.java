@@ -68,7 +68,6 @@ public class Main {
                 System.out.println("JOIN packet: "+joinPacket);
                 objOS.writeObject(joinPacket);      //Send the JOIN packet
                 reply = (String)objIS.readObject(); //Receive an ACK or an NAK
-                System.out.println("Unwrapped reply: "+reply);
                 serverMsg = msgUnwrapper(reply);
                 System.out.println("Message in the reply:\n"+serverMsg.message);//Print the message
                 if(serverMsg.msgType == ACK){ //If an ACK is received, start a ServerMsgReceiver Thread
