@@ -30,8 +30,6 @@ For the server:
  
 # User Guidance
 
-## Server Code
-
 The server should start before any client starts. It should be started from command lines by:
 
 javac -cp path_to_the_folder_of_gson_jar_files;path_to_gson_jar_files Main.java
