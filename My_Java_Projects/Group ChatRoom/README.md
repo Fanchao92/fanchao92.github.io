@@ -33,16 +33,19 @@ For the server:
 The server should start before any client starts. It should be started from command lines by:
 
 javac -cp path_to_the_folder_of_gson_jar_files;path_to_gson_jar_files Main.java
+
 java -cp path_to_the_folder_of_gson_jar_files;path_to_gson_jar_files Main TCP_port_number max_client_number
 
 The client should be started from command lines by:
 
 javac -cp path_to_the_folder_of_gson_jar_files;path_to_gson_jar_files Main.java
+
 java -cp path_to_the_folder_of_gson_jar_files;path_to_gson_jar_files Main server_IP TCP_port_number user_name
 
 For example, if the gson jar files are in D:\server, then the commands to start the server are:
 
 javac -cp D:\server;D:\server\gson-2.6.1.jar Main.java
+
 java -cp D:\server;D:\server\gson-2.6.1.jar Main 50000 20
 
 Remember, since we don't know about the threading security of gson jar files, it's recommanded to use a distinct copy of gson jar file for every client and server when you test the code on a single computer.
